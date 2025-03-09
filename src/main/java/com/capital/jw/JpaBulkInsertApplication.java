@@ -1,4 +1,4 @@
-package com.example.jpabulkinsert;
+package com.capital.jw;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

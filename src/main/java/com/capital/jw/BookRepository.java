@@ -1,4 +1,4 @@
-package com.example.jpabulkinsert;
+package com.capital.jw;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

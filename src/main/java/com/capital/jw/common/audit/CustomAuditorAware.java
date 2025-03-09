@@ -1,4 +1,4 @@
-package com.example.jpabulkinsert.audit;
+package com.capital.jw.common.audit;
 
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.stereotype.Component;

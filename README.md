@@ -1,124 +1,19 @@
-# Bulk Insert Entity
+# 캐피탈사의 신용대출(Loan) 도메인
 
-The `BulkInsertEntity` abstract class is designed to facilitate bulk insert operations in JPA entities.
+- 대출(Loan) 도메인은 고객의 신용 정보를 기반으로 대출 심사를 수행하고, 금액, 이자율, 상환 조건을 관리해야 함.
+- 비즈니스 로직: 대출 승인, 이자 계산, 상환 처리, 연체 관리 등 포함
+- JPA 엔티티를 활용하여 풍부한 도메인 모델을 설계
 
-It provides common fields and functionality required for bulk inserts, allowing entities to be saved in batches
-using `saveAll` method provided by `JpaRepository`.
+## 1. 신용대출(Loan) 도메인 요구사항
 
-## Usage
+### 핵심 기능
 
-To use the `BulkInsertEntity` abstract class:
-
-1. Create your entity class by extending `BulkInsertEntity`.
-2. Use `JpaRepository` provided by Spring Data JPA to save entities in bulk using the `saveAll` method.
-
-## BulkInsertEntity
-
-```java
-
-@Getter
-@ToString
-@MappedSuperclass
-@Audited
-@EntityListeners(AuditingEntityListener.class)
-public abstract class BulkInsertEntity implements Persistable<Long> {
-
-    @Transient
-    private boolean isNew = true;
-
-    @Override
-    public boolean isNew() {
-        return isNew;
-    }
-
-    @PostLoad
-    private void markIsNotNew() {
-        isNew = false;
-    }
-
-    @CreatedDate
-    @Column(nullable = false, updatable = false)
-    protected LocalDateTime createdDatetime;
-
-    @LastModifiedDate
-    @Column(nullable = false)
-    protected LocalDateTime updatedDatetime;
-
-    @CreatedBy
-    protected Long createdBy;
-
-    @LastModifiedBy
-    protected Long updatedBy;
-
-}
-```
-
-## Example
-
-```java
-
-@Entity
-@Getter
-@ToString
-@Builder
-@AllArgsConstructor(access = AccessLevel.PROTECTED)
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "Books")
-public class Book extends BulkInsertEntity {
-
-    @Id
-    @Column
-    private Long bookSeq;
-
-    @Column
-    private String title;
-
-    @Column
-    private String author;
-
-    @Column
-    private LocalDateTime publicationDate;
-
-    @Column(precision = 20, scale = 5)
-    private BigDecimal price;
-
-    @Override
-    public Long getId() {
-        return bookSeq;
-    }
-
-}
-```
-
-```java
-public interface BookRepository extends JpaRepository<Book, Long> {
-    // No additional methods required
-}
-```
-
-```java
-
-@Service
-public class BookService {
-
-    private final BookRepository repository;
-
-    @Autowired
-    public BookService(BookRepository repository) {
-        this.repository = repository;
-    }
-
-    public void saveEntitiesInBulk(List<Book> entities) {
-        repository.saveAll(entities);
-    }
-}
-```
-
-## Dependencies
-
-- Spring Data JPA: For data access and repository support
-- Lombok: For generating boilerplate code
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- 대출 신청 (LoanApplication)
+    - 고객이 대출을 신청할 때, 심사를 통해 승인 여부를 결정해야 한다.
+    - 고객의 신용 점수, 소득 등을 바탕으로 최대 한도를 결정한다.
+- 대출 승인 및 실행 (Loan)
+    - 심사 승인된 대출을 실제 실행하여 고객에게 자금을 지급한다.
+    - 대출 실행 후, 고객은 매월 원리금을 상환해야 한다.
+- 상환 및 연체 관리 (Repayment)
+    - 고객이 매월 상환할 때, 대출 상환 일정에 맞춰 처리된다.
+    - 연체된 경우, 연체 이자를 부과하고 신용등급을 조정할 수 있다.

@@ -1,4 +1,4 @@
-package com.example.jpabulkinsert.audit;
+package com.capital.jw.common.audit;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;

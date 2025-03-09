@@ -1,4 +1,4 @@
-package com.example.jpabulkinsert;
+package com.capital.jw;
 
 import lombok.Builder;
 import lombok.Data;
@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class BookSaveDto {
-    
+
     private String title;
 
     private String author;

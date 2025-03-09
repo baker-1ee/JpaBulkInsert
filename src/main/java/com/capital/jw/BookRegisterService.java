@@ -1,4 +1,4 @@
-package com.example.jpabulkinsert;
+package com.capital.jw;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
