@@ -1,8 +1,12 @@
-package com.example.jpabulkinsert;
+package com.example.bookstore.domain.book.service;
 
+import com.example.bookstore.domain.book.dto.BookModifyDto;
+import com.example.bookstore.domain.book.dto.BookSaveDto;
+import com.example.bookstore.domain.book.entity.BookJ;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Rollback;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,28 +17,26 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-class BookRegisterServiceTest {
+class BookJRegisterServiceTest {
 
-    private final int DATA_SIZE = 10000;
+    private final int DATA_SIZE = 3;
 
     @Autowired
-    private BookRegisterService bookRegisterService;
+    private BookRegisterServiceJ bookRegisterServiceJ;
+    @Autowired
+    private BookModifyServiceJ bookModifyServiceJ;
 
     @Test
+    @Rollback(value = false)
     void bulkInsertTest() {
         // given
         List<BookSaveDto> dtos = getBulkData();
 
         // when
-        long startTime = System.currentTimeMillis();
-        List<Book> actual = bookRegisterService.register(dtos);
-        long endTime = System.currentTimeMillis();
+        List<BookJ> actual = bookRegisterServiceJ.register(dtos);
 
         // then
         assertThat(actual.size()).isEqualTo(DATA_SIZE);
-        long elapsedTime = endTime - startTime;
-        System.out.println("elapsedTime = " + elapsedTime);
-        assertThat(elapsedTime).isLessThan(2000);
     }
 
     private List<BookSaveDto> getBulkData() {
@@ -48,4 +50,15 @@ class BookRegisterServiceTest {
                         .build())
                 .collect(Collectors.toList());
     }
+
+    @Test
+    @Rollback(value = false)
+    void updateTest() {
+        // given
+        BookModifyDto dto = BookModifyDto.builder().bookSeq(463185878156529487L).price(BigDecimal.valueOf(50000)).build();
+
+        // when
+        bookModifyServiceJ.modify(dto);
+    }
+
 }

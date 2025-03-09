@@ -1,11 +1,13 @@
-package com.example.jpabulkinsert;
+package com.example.bookstore.domain.book.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import com.example.bookstore.common.jpa.entity.BulkInsertEntityJ;
+import com.example.bookstore.domain.book.dto.BookSaveDto;
 import lombok.*;
 
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,7 +19,7 @@ import java.util.UUID;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "Books")
-public class Book extends BulkInsertEntity {
+public class BookJ extends BulkInsertEntityJ {
 
     @Id
     @Column
@@ -40,8 +42,8 @@ public class Book extends BulkInsertEntity {
         return bookSeq;
     }
 
-    public static Book from(BookSaveDto dto) {
-        return Book.builder()
+    public static BookJ from(BookSaveDto dto) {
+        return BookJ.builder()
                 .bookSeq(UUID.randomUUID().getMostSignificantBits())
                 .title(dto.getTitle())
                 .author(dto.getAuthor())
@@ -49,4 +51,9 @@ public class Book extends BulkInsertEntity {
                 .price(dto.getPrice())
                 .build();
     }
+
+    public void updatePrice(BigDecimal price) {
+        this.price = price;
+    }
+
 }

@@ -1,6 +1,5 @@
-package com.example.jpabulkinsert;
+package com.example.bookstore.common.jpa.entity;
 
-import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.ToString;
 import org.hibernate.envers.Audited;
@@ -8,9 +7,11 @@ import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.domain.Persistable;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import javax.persistence.Column;
+import javax.persistence.EntityListeners;
+import javax.persistence.MappedSuperclass;
 import java.time.LocalDateTime;
 
 @Getter
@@ -18,20 +19,7 @@ import java.time.LocalDateTime;
 @MappedSuperclass
 @Audited
 @EntityListeners(AuditingEntityListener.class)
-public abstract class BulkInsertEntity implements Persistable<Long> {
-
-    @Transient
-    private boolean isNew = true;
-
-    @Override
-    public boolean isNew() {
-        return isNew;
-    }
-
-    @PostLoad
-    private void markIsNotNew() {
-        isNew = false;
-    }
+public abstract class BasicEntityJ {
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
