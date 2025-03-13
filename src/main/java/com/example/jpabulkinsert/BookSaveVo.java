@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class BookSaveDto {
+public class BookSaveVo {
     
     private String title;
 

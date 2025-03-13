@@ -12,16 +12,38 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class BookRegisterService {
 
-    private final BookRepository bookRepository;
+    private final CustomIdBookRepository customIdBookRepository;
+    private final AutoIncrementedIdBookRepository autoIncrementedIdBookRepository;
+    private final SequenceIdBookRepository sequenceIdBookRepository;
 
     @Transactional
-    public List<Book> register(List<BookSaveDto> dtos) {
+    public List<CustomIdBookEntity> registerCustomIdBooks(List<BookSaveVo> voList) {
 
-        List<Book> newBooks = dtos.stream()
-                .map(Book::from)
+        List<CustomIdBookEntity> newBooks = voList.stream()
+                .map(CustomIdBookEntity::from)
                 .collect(Collectors.toList());
 
-        return bookRepository.saveAll(newBooks);
+        return customIdBookRepository.saveAll(newBooks);
+    }
+
+    @Transactional
+    public List<AutoIncrementedIdBookEntity> registerAutoIncrementedIdBooks(List<BookSaveVo> voList) {
+
+        List<AutoIncrementedIdBookEntity> newBooks = voList.stream()
+                .map(AutoIncrementedIdBookEntity::from)
+                .collect(Collectors.toList());
+
+        return autoIncrementedIdBookRepository.saveAll(newBooks);
+    }
+
+    @Transactional
+    public List<SequenceIdBookEntity> registerSequenceIdBooks(List<BookSaveVo> voList) {
+
+        List<SequenceIdBookEntity> newBooks = voList.stream()
+                .map(SequenceIdBookEntity::from)
+                .collect(Collectors.toList());
+
+        return sequenceIdBookRepository.saveAll(newBooks);
     }
 
 }

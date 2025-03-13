@@ -2,6 +2,6 @@ package com.example.jpabulkinsert;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface BookRepository extends JpaRepository<Book, Long> {
+public interface CustomIdBookRepository extends JpaRepository<CustomIdBookEntity, Long> {
 
 }

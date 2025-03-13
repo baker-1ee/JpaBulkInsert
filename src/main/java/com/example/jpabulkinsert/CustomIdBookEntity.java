@@ -1,5 +1,6 @@
 package com.example.jpabulkinsert;
 
+import com.example.jpabulkinsert.common.SequenceHolder;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -8,7 +9,6 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Getter
@@ -16,8 +16,8 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "Books")
-public class Book extends BulkInsertEntity {
+@Table(name = "CustomIdBook")
+public class CustomIdBookEntity {
 
     @Id
     @Column
@@ -32,21 +32,21 @@ public class Book extends BulkInsertEntity {
     @Column
     private LocalDateTime publicationDate;
 
-    @Column(precision = 20, scale = 5)
+    @Column
     private BigDecimal price;
 
-    @Override
-    public Long getId() {
-        return bookSeq;
-    }
+//    @Override
+//    public Long getId() {
+//        return bookSeq;
+//    }
 
-    public static Book from(BookSaveDto dto) {
-        return Book.builder()
-                .bookSeq(UUID.randomUUID().getMostSignificantBits())
-                .title(dto.getTitle())
-                .author(dto.getAuthor())
-                .publicationDate(dto.getPublicationDate())
-                .price(dto.getPrice())
+    public static CustomIdBookEntity from(BookSaveVo vo) {
+        return CustomIdBookEntity.builder()
+                .bookSeq(SequenceHolder.nextValue())
+                .title(vo.getTitle())
+                .author(vo.getAuthor())
+                .publicationDate(vo.getPublicationDate())
+                .price(vo.getPrice())
                 .build();
     }
 }
