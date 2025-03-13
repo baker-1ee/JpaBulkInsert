@@ -31,6 +31,12 @@ dependencies {
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // ✅ SLF4J & Logback 설정 (로깅)
+    implementation 'org.slf4j:slf4j-api'
+    implementation 'ch.qos.logback:logback-classic'
+
+    // ✅ P6Spy (JPA & JDBC SQL 로그 확인)
+    implementation 'p6spy:p6spy:3.9.1'
 }
 
 tasks.named('test') {
