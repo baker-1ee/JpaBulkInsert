@@ -1,23 +1,22 @@
 package com.example.jpabulkinsert;
 
 import com.example.jpabulkinsert.common.SequenceHolder;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import lombok.*;
 
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@ToString
-@Builder
+@Builder(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "CustomIdBook")
-public class CustomIdBookEntity {
+public class CustomIdBookEntity extends BulkInsertEntity<Long> {
 
     @Id
     @Column
@@ -32,13 +31,13 @@ public class CustomIdBookEntity {
     @Column
     private LocalDateTime publicationDate;
 
-    @Column
+    @Column(length = 20)
     private BigDecimal price;
 
-//    @Override
-//    public Long getId() {
-//        return bookSeq;
-//    }
+    @Override
+    public Long getId() {
+        return bookSeq;
+    }
 
     public static CustomIdBookEntity from(BookSaveVo vo) {
         return CustomIdBookEntity.builder()

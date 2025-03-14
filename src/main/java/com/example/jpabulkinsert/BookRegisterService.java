@@ -12,19 +12,9 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class BookRegisterService {
 
-    private final CustomIdBookRepository customIdBookRepository;
     private final AutoIncrementedIdBookRepository autoIncrementedIdBookRepository;
     private final SequenceIdBookRepository sequenceIdBookRepository;
-
-    @Transactional
-    public List<CustomIdBookEntity> registerCustomIdBooks(List<BookSaveVo> voList) {
-
-        List<CustomIdBookEntity> newBooks = voList.stream()
-                .map(CustomIdBookEntity::from)
-                .collect(Collectors.toList());
-
-        return customIdBookRepository.saveAll(newBooks);
-    }
+    private final CustomIdBookRepository customIdBookRepository;
 
     @Transactional
     public List<AutoIncrementedIdBookEntity> registerAutoIncrementedIdBooks(List<BookSaveVo> voList) {
@@ -44,6 +34,16 @@ public class BookRegisterService {
                 .collect(Collectors.toList());
 
         return sequenceIdBookRepository.saveAll(newBooks);
+    }
+
+    @Transactional
+    public List<CustomIdBookEntity> registerCustomIdBooks(List<BookSaveVo> voList) {
+
+        List<CustomIdBookEntity> newBooks = voList.stream()
+                .map(CustomIdBookEntity::from)
+                .collect(Collectors.toList());
+
+        return customIdBookRepository.saveAll(newBooks);
     }
 
 }

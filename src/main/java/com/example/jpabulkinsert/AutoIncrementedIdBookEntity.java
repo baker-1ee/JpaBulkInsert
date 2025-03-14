@@ -1,19 +1,18 @@
 package com.example.jpabulkinsert;
 
-import jakarta.persistence.*;
 import lombok.*;
 
+import javax.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@ToString
-@Builder
+@Builder(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "AutoIncrementedIdBook")
-public class AutoIncrementedIdBookEntity {
+public class AutoIncrementedIdBookEntity extends BulkInsertEntity<Long> {
 
     @Id
     @Column
@@ -29,13 +28,8 @@ public class AutoIncrementedIdBookEntity {
     @Column
     private LocalDateTime publicationDate;
 
-    @Column
+    @Column(length = 20)
     private BigDecimal price;
-
-//    @Override
-//    public Long getId() {
-//        return bookSeq;
-//    }
 
     public static AutoIncrementedIdBookEntity from(BookSaveVo vo) {
         return AutoIncrementedIdBookEntity.builder()
@@ -44,5 +38,10 @@ public class AutoIncrementedIdBookEntity {
                 .publicationDate(vo.getPublicationDate())
                 .price(vo.getPrice())
                 .build();
+    }
+
+    @Override
+    public Long getId() {
+        return bookSeq;
     }
 }

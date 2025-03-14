@@ -1,5 +1,7 @@
 package com.example.jpabulkinsert;
 
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,15 +14,17 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Slf4j
 @SpringBootTest
-class CustomIdBookEntityRegisterServiceTest {
+class BookRegisterServiceTest {
 
-    private final int DATA_SIZE = 3;
+    private final int DATA_SIZE = 10;
 
     @Autowired
     private BookRegisterService bookRegisterService;
 
     @Test
+    @DisplayName("auto increment entity saveAll 테스트")
     void testAutoIncrementedIdBookEntityRegisterService() {
         // given
         List<BookSaveVo> voList = getBookSaveVoList();
@@ -32,11 +36,11 @@ class CustomIdBookEntityRegisterServiceTest {
 
         // then
         assertThat(actual.size()).isEqualTo(DATA_SIZE);
-        long elapsedTime = endTime - startTime;
-        System.out.println("elapsedTime = " + elapsedTime);
+        log.error("auto increment : {} ms", endTime - startTime);
     }
 
     @Test
+    @DisplayName("sequence 채번 전략 entity saveAll 테스트")
     void testSequenceIdBookEntityRegisterService() {
         // given
         List<BookSaveVo> voList = getBookSaveVoList();
@@ -48,11 +52,11 @@ class CustomIdBookEntityRegisterServiceTest {
 
         // then
         assertThat(actual.size()).isEqualTo(DATA_SIZE);
-        long elapsedTime = endTime - startTime;
-        System.out.println("elapsedTime = " + elapsedTime);
+        log.error("sequence : {} ms", endTime - startTime);
     }
 
     @Test
+    @DisplayName("id 직접할당 entity saveAll 테스트")
     void testCustomIdBookEntityRegisterService() {
         // given
         List<BookSaveVo> voList = getBookSaveVoList();
@@ -64,18 +68,16 @@ class CustomIdBookEntityRegisterServiceTest {
 
         // then
         assertThat(actual.size()).isEqualTo(DATA_SIZE);
-        long elapsedTime = endTime - startTime;
-        System.out.println("elapsedTime = " + elapsedTime);
+        log.error("id : {} ms", endTime - startTime);
     }
-
 
 
     private List<BookSaveVo> getBookSaveVoList() {
         return IntStream.rangeClosed(1, DATA_SIZE)
                 .mapToObj(i -> BookSaveVo
                         .builder()
-                        .title("jpa bulk insert")
-                        .author("john")
+                        .title("Hello JPA")
+                        .author("JW")
                         .publicationDate(LocalDateTime.now())
                         .price(BigDecimal.valueOf(i))
                         .build())
