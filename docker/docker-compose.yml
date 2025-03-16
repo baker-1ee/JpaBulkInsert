@@ -1,18 +1,44 @@
 version: "3.9"
 services:
-  db2:
-    image: mysql:8.0.28
-    platform: linux/x86_64
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql-8.0
+    platform: linux/arm64
     restart: always
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: bulk
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: mysqldb
       MYSQL_USER: sa
       MYSQL_PASSWORD: 1234
-      TZ: Asia/Seoul
     volumes:
-      - ./db/mysql/data:/var/lib/mysql
-      - ./db/mysql/config:/etc/mysql/conf.d
-      - ./db/mysql/init:/docker-entrypoint-initdb.d
+      - mysql-data:/var/lib/mysql
+
+  # service name
+  # id : system
+  # pw : 1234
+  # database name : orclcdb
+  oracle-db:
+    image: gvenzl/oracle-free:latest  # ARM 지원되는 Oracle 23c Free 버전
+    container_name: oracle-23c
+    platform: linux/arm64  # M2 Mac에서도 네이티브 실행 가능
+    restart: always
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      ORACLE_PASSWORD: 1234
+      ORACLE_DATABASE: orclcdb
+      ORACLE_PDB: freepdb1
+      ORACLE_CHARACTERSET: AL32UTF8
+      ORACLE_ALLOW_REMOTE: true
+      ORACLE_ENABLE_XDB: true
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+
+volumes:
+  mysql-data:
+    driver: local
+  oracle-data:
+    driver: local

@@ -3,21 +3,28 @@ server:
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/bulk?profileSQL=true&logger=Slf4JLogger&rewriteBatchedStatements=true
-    username: sa
-    password: 1234
+    oracle:
+      url: jdbc:oracle:thin:@//localhost:1521/orclcdb
+      driver-class-name: oracle.jdbc.OracleDriver
+      username: sa
+      password: 1234
+
+    mysql:
+      url: jdbc:mysql://localhost:3306/mysqldb?profileSQL=true&logger=Slf4JLogger&rewriteBatchedStatements=true
+      username: sa
+      password: 1234
+
   jpa:
-    show-sql: true
+    show-sql: false
     open-in-view: false
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
         show_sql: false
         format_sql: false
         order_inserts: true
         order_updates: true
         jdbc:
-          batch_size: 10000
+          batch_size: 1000
 

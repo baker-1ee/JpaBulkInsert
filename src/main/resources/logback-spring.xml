@@ -1,11 +1,22 @@
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <logger name="com.example" level="INFO"/>
+    <!-- Hibernate SQL 로그 숨기기 -->
+    <logger name="org.hibernate.SQL" level="OFF"/>
+    <logger name="org.hibernate.type.descriptor.sql" level="OFF"/>
+
+    <!-- Hibernate 내부 로깅 (쿼리 실행 로그) 숨기기 -->
+    <logger name="org.hibernate.engine.jdbc.batch.internal.BatchingBatch" level="OFF"/>
+    <logger name="org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl" level="OFF"/>
+    <logger name="org.hibernate.stat.internal.StatisticsImpl" level="OFF"/>
+
+    <!-- Spring Boot 기본 로깅 -->
+    <logger name="com.jw" level="DEBUG"/>
+
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>
