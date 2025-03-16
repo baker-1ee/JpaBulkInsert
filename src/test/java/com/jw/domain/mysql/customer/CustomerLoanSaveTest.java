@@ -16,6 +16,8 @@ import java.util.stream.IntStream;
 
 @Slf4j
 @SpringBootTest
+@Transactional(transactionManager = "mysqlTransactionManager")
+@Rollback(false)
 class CustomerLoanSaveTest {
 
     @Autowired
@@ -24,8 +26,6 @@ class CustomerLoanSaveTest {
     private CustomerLoanRepositoryMysql loanRepository;
 
     @Test
-    @Transactional(transactionManager = "mysqlTransactionManager")
-    @Rollback(false)
     void test() {
         List<Customer> customers = IntStream.range(0, 5)
                 .mapToObj(i -> Customer.only("홍길동" + i))

@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -15,6 +17,8 @@ import java.util.stream.IntStream;
 
 @Slf4j
 @SpringBootTest
+@Transactional(transactionManager = "oracleTransactionManager")
+@Rollback(false)
 class CustomerLoanSaveTest {
 
     @Autowired
