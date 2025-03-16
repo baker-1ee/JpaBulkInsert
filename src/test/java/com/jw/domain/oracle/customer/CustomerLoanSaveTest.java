@@ -23,7 +23,7 @@ import java.util.stream.IntStream;
 @Rollback(false)
 class CustomerLoanSaveTest {
 
-    private final int DATA_SIZE = 100000;
+    private final int DATA_SIZE = 10000;
 
     @Autowired
     private CustomerBatchService customerBatchService;

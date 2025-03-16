@@ -28,7 +28,7 @@ public class CustomerBatchService {
 
         StringBuilder sql = new StringBuilder("INSERT ALL ");
         for (Customer customer : customers) {
-            sql.append(String.format("INTO customer (id, name) VALUES (%d, '%s') ",
+            sql.append(String.format("INTO CUSTOMER (ID, NM) VALUES (%d, '%s') ",
                     customer.getId(), customer.getName()));
         }
         sql.append("SELECT 1 FROM DUAL");
