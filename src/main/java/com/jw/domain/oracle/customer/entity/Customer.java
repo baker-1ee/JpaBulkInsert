@@ -33,6 +33,13 @@ public class Customer {
                 .build();
     }
 
+    public static Customer of(Long id, String name) {
+        return Customer.builder()
+                .id(id)
+                .name(name)
+                .build();
+    }
+
     public static Customer withLoans(String name, List<CustomerLoan> customerLoans) {
         return Customer.builder()
                 .name(name)
