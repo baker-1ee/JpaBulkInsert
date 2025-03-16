@@ -36,7 +36,7 @@ public class DataSourceConfig {
     public DataSource oracleProxyDataSource(DataSource oracleDataSource) {
         return ProxyDataSourceBuilder.create(oracleDataSource)
                 .name("ORACLE-LOGGER")
-                .logQueryBySlf4j(log.getName())
+//                .logQueryBySlf4j(log.getName())
                 .asJson()
                 .countQuery()
                 .build();

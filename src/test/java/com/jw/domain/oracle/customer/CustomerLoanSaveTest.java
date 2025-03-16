@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StopWatch;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,6 +22,8 @@ import java.util.stream.IntStream;
 @Rollback(false)
 class CustomerLoanSaveTest {
 
+    private final int DATA_SIZE = 100000;
+
     @Autowired
     private CustomerRepositoryOracle customerRepository;
     @Autowired
@@ -28,10 +31,17 @@ class CustomerLoanSaveTest {
 
     @Test
     void test() {
-        List<Customer> customers = IntStream.range(0, 2)
+        List<Customer> customers = IntStream.rangeClosed(1, DATA_SIZE)
                 .mapToObj(i -> Customer.only("홍길동" + i))
                 .collect(Collectors.toList());
-        log.info("customers size: {}", customers.size());
-        customerRepository.saveAll(customers); // 한 번에 저장
+
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start("Batch Insert");
+
+        customerRepository.saveAll(customers);
+        customerRepository.flush();
+
+        stopWatch.stop();
+        log.info("size : {}, elapsed time : {} ms)", DATA_SIZE, stopWatch.getLastTaskTimeMillis());
     }
 }
