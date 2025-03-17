@@ -1,4 +1,4 @@
-package com.jw.common;
+package com.jw.common.id;
 
 import java.util.UUID;
 
