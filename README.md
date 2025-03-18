@@ -1,3 +1,503 @@
+# Hibernate/JPA Batch Insert/Update
+
+## 1. 개요
+
+이 문서는 Hibernate/JPA를 사용하여 엔터티를 batch insert 및 batch update 해야 하는 이유와 방법에 대해 정리하였습니다.
+
+batch insert/update는 여러 개의 SQL 문을 한 번의 네트워크 호출로 데이터베이스에 전송하여 애플리케이션의 네트워크 및 메모리 사용량을 최적화하는 기법입니다.
+
+우선 Oracle DB를 사용하는 경우를 먼저 알아보고, MySQL DB를 사용하는 경우도 알아보겠습니다.
+
+## 2. 들어가기 전에
+
+### 2.1. 샘플 데이터 모델
+
+아래는 예제에서 사용할 데이터 모델입니다.
+
+대출 실행 되어 Loan 엔티티가 생성될 때, 대출 개월수 만큼의 LoanSchedule 엔티티가 생성됩니다.
+
+Loan : LoanSchedule = 1 : N 의 부모-자식 관계이며, 연관관계 매핑되어 있습니다.
+
+엔티티의 ID 생성 전략은 Oracle DB 에서 일반적으로 사용하는 시퀀스 전략입니다.
+
+#### `Loan(대출)` 엔티티
+
+```java
+
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder(access = AccessLevel.PROTECTED)
+@Getter
+@Entity
+@Table(name = "LOAN")
+@SequenceGenerator(name = "LOAN_SQ_GEN", sequenceName = "SQ_LOAN", allocationSize = 1)
+public class Loan {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "LOAN_SQ_GEN")
+    @Column(name = "ID", nullable = false)
+    private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "TYPE", nullable = false)
+    private LoanType type;
+
+    @Column(name = "AMOUNT", nullable = false, scale = 25)
+    private BigDecimal amount;
+
+    @Column(name = "INTEREST_RATE", nullable = false, scale = 2, precision = 3)
+    private BigDecimal interestRate;
+
+    @Column(name = "DURATION_MONTHS", nullable = false)
+    private int durationMonths;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "loan", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<LoanSchedule> loanSchedules = new ArrayList<>();
+
+    // Loan 생성 시, LoanSchedule 까지 생성
+    public static Loan createCreditLoan(LoanSaveVo vo) {
+        Loan loan = Loan.builder()
+                .type(LoanType.CREDIT_LOAN)
+                .amount(vo.getAmount())
+                .interestRate(vo.getInterestRate())
+                .durationMonths(vo.getDurationMonths())
+                .build();
+        loan.generateRepaymentSchedule();
+        return loan;
+    }
+
+    // 대출 실행 시 월별 상환 일정 자동 생성
+    private void generateRepaymentSchedule() {
+        BigDecimal monthlyPayment = calculateMonthlyPayment();
+        IntStream.rangeClosed(1, durationMonths)
+                .mapToObj(month -> LoanSchedule.of(this, month, monthlyPayment))
+                .forEach(loanSchedules::add);
+    }
+
+    // 대출 월 상환금 계산 (원금/기간) + (월 이자)
+    private BigDecimal calculateMonthlyPayment() {
+        return amount.divide(valueOf(durationMonths), 5, HALF_UP)
+                .add(amount.multiply(interestRate
+                        .divide(valueOf(100), 5, HALF_UP)
+                        .divide(valueOf(12), 5, HALF_UP)));
+    }
+}
+```
+
+#### `LoanSchedule(대출상환일정)` 엔터티
+
+```java
+
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder(access = AccessLevel.PROTECTED)
+@Getter
+@Entity
+@Table(name = "LOAN_SCHEDULE")
+@SequenceGenerator(name = "LOAN_SCHEDULE_SQ_GEN", sequenceName = "SQ_LOAN_SCHEDULE", allocationSize = 1)
+public class LoanSchedule {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "LOAN_SCHEDULE_SQ_GEN")
+    @Column(name = "ID", nullable = false)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "LOAN_ID", nullable = false)
+    private Loan loan;
+
+    @Column(name = "INSTALLMENT_NO", nullable = false)
+    private int installmentNo;
+
+    @Column(name = "PAYMENT_AMOUNT", nullable = false)
+    private BigDecimal paymentAmount;
+
+    // 대출 상환 일정 생성 팩토리 메서드
+    public static LoanSchedule of(Loan loan, int installmentNo, BigDecimal paymentAmount) {
+        return LoanSchedule.builder()
+                .loan(loan)
+                .installmentNo(installmentNo)
+                .paymentAmount(paymentAmount)
+                .build();
+    }
+}
+```
+
+대출 실행 서비스입니다.
+
+Loan 엔티티가 LoanSchedule 엔티티의 List를 CascadeType.ALL 필드로 가지고 있기 때문에 Loan 엔티티가 저장될 때, 자식 엔티티인 LoanScheudle 엔티티도 저장 됩니다.
+
+```java
+
+@Service
+@RequiredArgsConstructor
+public class LoanExecuteService {
+
+    private final LoanRepository loanRepository;
+
+    @Transactional
+    public Loan executeCreditLoan(LoanSaveVo vo) {
+        Loan loan = Loan.createCreditLoan(vo);
+        return loanRepository.save(loan);
+    }
+
+}
+```
+
+대출 실행 서비스의 테스트 코드입니다.
+
+Loan 엔티티 2개를 생성하여 하나의 트랜잭션에서 신규 생성하여 저장합니다.
+
+첫번째 Loan 엔티티의 대출 개월수가 3개월이므로 LoanSchedule 엔티티 3개가 저장되며,
+
+두번째 Loan 엔티티의 대출 개월수가 2개월이므로 LoanSchedule 엔티티 2개 저장될 것입니다.
+
+최종적으로 2개의 Loan 엔티티와 5개의 LoanSchedule 엔티티를 저장하게 됩니다.
+
+```java
+
+@Slf4j
+@SpringBootTest
+@Rollback(false)
+class LoanExecuteServiceTest {
+    @Autowired
+    private LoanExecuteService loanExecuteService;
+
+    @Test
+    @Transactional
+    void createCreditLoan() {
+        loanExecuteService.executeCreditLoan(
+                LoanSaveVo.builder()
+                        .amount(BigDecimal.valueOf(10_000_000))
+                        .interestRate(BigDecimal.valueOf(3.0))
+                        .durationMonths(3)
+                        .build()
+        );
+        loanExecuteService.executeCreditLoan(
+                LoanSaveVo.builder()
+                        .amount(BigDecimal.valueOf(2_000_000))
+                        .interestRate(BigDecimal.valueOf(2.0))
+                        .durationMonths(2)
+                        .build()
+        );
+    }
+}
+```
+
+### 2.2. SQL 로그 추적
+
+참고로 Hibernate SQL 로그는 실제 DB에 실행되는 SQL이 아닙니다.
+
+MySQL DB는 JDBC 연결 시 파라미터로 `profileSQL=true&logger=Slf4JLogger` 를 추가하면 실제 쿼리 로그를 Slf4J 로거로 연결할 수 있습니다.
+
+Oracle DB에서는 별도로 지원하는 옵션이 없어서 `net.ttddyy:datasource-proxy:1.8` 라이브러리를 사용하여 DataSource를 프록싱하면
+
+JDBC 레벨의 쿼리 로그를 Slf4J 로거에 연결할 수 있습니다.
+
+```java
+
+@Bean
+public DataSource oracleProxyDataSource(DataSource oracleDataSource) {
+    return ProxyDataSourceBuilder.create(oracleDataSource)
+            .name("ORACLE-LOGGER")
+            .logQueryBySlf4j(log.getName())
+            .multiline()
+            .asJson()
+            .countQuery()
+            .build();
+}
+```
+
+## 3. JPA 기본 동작 확인
+
+Hibernate는 기본적으로 배치를 활성화하지 않습니다.
+
+아래의 테스트 코드를 실행해보겠습니다.
+
+```java
+
+@Slf4j
+@SpringBootTest
+@Rollback(false)
+class LoanExecuteServiceTest {
+    @Autowired
+    private LoanExecuteService loanExecuteService;
+
+    @Test
+    @Transactional
+    void createCreditLoan() {
+        loanExecuteService.executeCreditLoan(
+                LoanSaveVo.builder()
+                        .amount(BigDecimal.valueOf(10_000_000))
+                        .interestRate(BigDecimal.valueOf(3.0))
+                        .durationMonths(3)
+                        .build()
+        );
+        loanExecuteService.executeCreditLoan(
+                LoanSaveVo.builder()
+                        .amount(BigDecimal.valueOf(2_000_000))
+                        .interestRate(BigDecimal.valueOf(2.0))
+                        .durationMonths(2)
+                        .build()
+        );
+    }
+}
+```
+
+이 경우, 트랜잭션이 완료 되는 시점에 영속성 컨텍스트에 있던 쿼리들이 순차적으로 실행됩니다.
+
+먼저 시퀀스를 순차적으로 채번해옵니다.
+
+그리고, Loan 1번, LoanSchedule 3번, Loan 1번, LoanSchedule 2번의 INSERT 문이 개별적으로 실행됩니다.
+
+```sql
+Name
+:ORACLE-LOGGER, Connection:4, Time:14, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:7, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan_schedule.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:7, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan_schedule.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:2, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan_schedule.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan_schedule.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:2, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan_schedule.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["select sq_loan_schedule.nextval from dual"]
+Params:[()]
+
+Name:ORACLE-LOGGER, Connection:4, Time:10, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan (amount, duration_months, interest_rate, type, id) values (?, ?, ?, ?, ?)"]
+Params:[(10000000,4,4.0,CREDIT_LOAN,1)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:3, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(1,1,2533300.00000,1)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(2,1,2533300.00000,2)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(3,1,2533300.00000,3)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(4,1,2533300.00000,4)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:0, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan (amount, duration_months, interest_rate, type, id) values (?, ?, ?, ?, ?)"]
+Params:[(2000000,2,2.0,CREDIT_LOAN,2)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:0, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(1,2,1003340.00000,5)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:False, QuerySize:1, BatchSize:0
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(2,2,1003340.00000,6)]
+```
+
+N개의 SQL문이 N번의 네트워크 호출로 데이터베이스에 전송되고 있습니다.
+
+이 부분을 최적화하기 위해 hibernate 에는 batch 설정을 지원합니다.
+
+## 4. JPA Batch 설정 및 효과
+
+배치를 활성화하려면 `hibernate.jdbc.batch_size` 속성을 설정해야 합니다.
+
+#### application.yml 설정
+
+```properties
+spring.jpa.properties.hibernate.jdbc.batch_size=1000
+```
+
+이제 다시 테스트 코드를 실행하여 쿼리 결과를 확인해봅니다.
+
+시퀀스 채번해오는 쿼리는 그대로이니 생략하였습니다.
+
+INSERT 쿼리가 조금 달라졌습니다.
+
+Loan 1번, LoanSchedule 1번, Loan 1번, LoanSchedule 1번으로 기존 7개의 SQL이 4개로 줄었습니다.
+
+```sql
+Name
+:ORACLE-LOGGER, Connection:4, Time:15, Success:True
+Type:Prepared, Batch:True, QuerySize:1, BatchSize:1
+Query:["insert into loan (amount, duration_months, interest_rate, type, id) values (?, ?, ?, ?, ?)"]
+Params:[(10000000,3,3.0,CREDIT_LOAN,1)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:4, Success:True
+Type:Prepared, Batch:True, QuerySize:1, BatchSize:3
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(1,1,3358333.33333,1),(2,1,3358333.33333,2),(3,1,3358333.33333,3)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:1, Success:True
+Type:Prepared, Batch:True, QuerySize:1, BatchSize:1
+Query:["insert into loan (amount, duration_months, interest_rate, type, id) values (?, ?, ?, ?, ?)"]
+Params:[(2000000,2,2.0,CREDIT_LOAN,2)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:0, Success:True
+Type:Prepared, Batch:True, QuerySize:1, BatchSize:2
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(1,2,1003340.00000,4),(2,2,1003340.00000,5)]
+```
+
+여기서 한번 더 JPA 설정을 추가합니다.
+
+```properties
+spring.jpa.properties.hibernate.order_inserts:true
+spring.jpa.properties.hibernate.order_updates:true
+```
+
+다시 테스트 코드를 실행하여 쿼리 결과를 확인해봅니다.
+
+Loan 1번, LoanSchedule 1번으로 7개에서 4개로 줄었던 것이 2번으로 한번 더 최적화 되었습니다.
+
+해당 설정을 하면 Hibernate가 같은 엔티티 타입끼리 묶어서 Batch Insert/Update 쿼리를 실행합니다.
+
+```sql
+Name
+:ORACLE-LOGGER, Connection:4, Time:22, Success:True
+Type:Prepared, Batch:True, QuerySize:1, BatchSize:2
+Query:["insert into loan (amount, duration_months, interest_rate, type, id) values (?, ?, ?, ?, ?)"]
+Params:[(10000000,3,3.0,CREDIT_LOAN,1),(2000000,2,2.0,CREDIT_LOAN,2)]
+
+Name:ORACLE-LOGGER, Connection:4, Time:5, Success:True
+Type:Prepared, Batch:True, QuerySize:1, BatchSize:5
+Query:["insert into loan_schedule (installment_no, loan_id, payment_amount, id) values (?, ?, ?, ?)"]
+Params:[(1,1,3358333.33333,1),(2,1,3358333.33333,2),(3,1,3358333.33333,3),(1,2,1003340.00000,4),(2,2,1003340.00000,5)]
+```
+
+## 5. Oracle DB와 MySQL 비교
+
+지금까지 알아본 것처럼 Batch Insert 를 적용하면 그룹핑된 INSERT문이 적은 네트워크 비용으로 DB에 전송됩니다.
+
+하지만, Oracle DB 에서는 배치로 전송된 쿼리는 결국 개별 INSERT 문으로 실행됩니다.
+
+Oracle DB 는 MySQL DB와 다르게 Multi Value Insert 를 지원하지 않기 때문입니다.
+
+우선 MySQL DB의 Batch Insert 부터 알아보겠습니다.
+
+MySQL DB에서 기존 설정을 적용 한 뒤, JDBC URL에 `rewriteBatchedStatements=true` 옵션을 추가하면 Batch 쿼리가 JDBC 레벨에서 Multi-Value Insert 형태로
+변환됩니다.
+
+실제 MySQL DB에서 실행되는 쿼리는 아래와 같습니다.
+
+```sql
+insert into loan (amount, duration_months, interest_rate, type, id)
+values (10000000, 3, 3.0, 'CREDIT_LOAN', 1),
+       (2000000, 2, 2.0, 'CREDIT_LOAN', 2)
+    insert
+into loan_schedule (installment_no, loan_id, payment_amount, id)
+values (1, 1, 3358333.33333, 1), (2, 1, 3358333.33333, 2), (3, 1, 3358333.33333, 3), (1, 2, 1003340.00000, 4), (2, 2, 1003340.00000, 5)
+```
+
+### 5-1. Oracle DB의 배치 처리 방식
+
+Oracle의 JDBC 드라이버는 배치 Insert를 지원하지만, 실행 방식이 MySQL과 다릅니다.
+
+Hibernate가 batch_size 만큼의 INSERT 문을 하나의 배치로 그룹핑하여 DB로 전송됩니다.
+
+하지만, Oracle DB 내부에서는 여전히 개별적인 INSERT 문으로 실행됩니다.
+
+즉, 네트워크 트래픽 절감 효과는 있지만, 실제 실행되는 SQL 문 수는 그대로 유지됩니다.
+
+```sql
+-- Hibernate는 배치 처리로 묶어서 보냄 (네트워크 트래픽 감소 효과)
+INSERT INTO loan (amount, duration_months, interest_rate, type, id)
+VALUES (?, ?, ?, ?, ?);
+INSERT INTO loan_schedule (installment_no, loan_id, payment_amount, id)
+VALUES (?, ?, ?, ?);
+```
+
+오라클에서도 INSERT ALL 문을 Native Query 로 구현하면 사용할 수는 있지만, 실제 테스트 해보니 삽입 건수가 100건 정도 되니 에러가 발생하였습니다.
+
+```sql
+INSERT
+ALL 
+    INTO loan (amount, duration_months, interest_rate, type, id) VALUES (10000000, 3, 3.0, 'CREDIT_LOAN', 1)
+    INTO loan (amount, duration_months, interest_rate, type, id) VALUES (2000000, 2, 2.0, 'CREDIT_LOAN', 2)
+SELECT 1
+FROM DUAL;
+```
+
+### 5-2. MySQL의 배치 처리 방식
+
+MySQL은 기본적으로 Multi-Value Insert를 지원하며, JDBC 드라이버에서 이를 활용할 수 있도록 설정이 가능합니다.
+
+rewriteBatchedStatements=true 옵션을 활성화하면, JDBC 드라이버가 Batch Insert 문을 하나의 Multi-Value Insert 문으로 변환하여 실행
+
+즉, 네트워크 트래픽 절감 + SQL 실행 성능 향상 모두 가능
+
+### 5-3. Batch Insert 전/후 DB 별 성능 비교
+
+Bulk Insert 적용 전/후 성능 비교 (Oracle vs MySQL)
+
+| **건수**    | **DBMS**   | **Bulk Insert 적용 전 (ms)** | **Bulk Insert 적용 후 (ms)** | **성능 개선율 (%)** |
+|-----------|------------|---------------------------|---------------------------|----------------|
+| **1만 건**  | **Oracle** | 10,335 ms                 | 9,163 ms                  | **11.3%** 개선   |
+| **1만 건**  | **MySQL**  | 3,871 ms                  | 992 ms                    | **74.4%** 개선   |
+| **10만 건** | **Oracle** | 83,667 ms                 | 55,033 ms                 | **34.2%** 개선   |
+| **10만 건** | **MySQL**  | 33,879 ms                 | 3,332 ms                  | **90.2%** 개선   |
+
+Oracle은 Batch Insert 적용 후 속도 개선
+
+MySQL은 Multi-Value Insert + JDBC Batch Processing을 활용한 최적화가 효과적
+
+JPA를 활용한 대량 데이터 Insert 시 MySQL이 유리
+
+## 6. 요약
+
+| **DBMS**   | **Batch Insert 처리 방식**   | **Multi-Value Insert 지원** | **성능 최적화 방법**                          |
+|------------|--------------------------|---------------------------|----------------------------------------|
+| **Oracle** | 개별 INSERT 문으로 실행         | 미지원                       | INSERT ALL 사용 가능하나 불안정 (Hibernate 미지원) |
+| **MySQL**  | Multi-Value Insert 변환 가능 | 지원                        | rewriteBatchedStatements=true 활성화      |
+
+- Oracle에서는 네트워크 트래픽 감소는 되지만, SQL 문은 그대로 실행
+
+- MySQL에서는 JDBC 드라이버 설정만으로 Multi-Value Insert로 최적화 가능
+
+- Hibernate/JPA 환경에서 MySQL이 배치 Insert 성능 최적화 측면에서 더 유리함
+
+다음 문서에서는 엔티티의 ID 생성 전략 별 Batch Insert 동작 방식의 차이 및 성능 비교에 대해 알아보겠습니다.
+
 # JPA의 Bulk Insert : ID 생성 전략에 따른 성능 비교
 
 JPA에서 `saveAll()`을 이용한 Bulk Insert 성능은 ID 생성 전략에 따라 크게 달라질 수 있습니다.
