@@ -16,7 +16,9 @@ public class LoanExecuteService {
     @Transactional(transactionManager = "oracleTransactionManager")
     public Loan executeCreditLoan(LoanSaveVo vo) {
         Loan loan = Loan.createCreditLoan(vo);
-        return loanRepository.save(loan);
+        Loan save = loanRepository.save(loan);
+        loanRepository.flush();
+        return save;
     }
 
 }
